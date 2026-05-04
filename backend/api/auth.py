@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordRequestForm
+from fastapi.security import OAuth2PasswordBearer
 from sqlmodel import Session, select
 from pydantic import BaseModel
 
@@ -8,6 +8,11 @@ from core.models import User
 from core.auth import hash_password, verify_password, create_access_token, get_current_user
 
 router = APIRouter()
+
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
 
 
 class Token(BaseModel):
@@ -26,15 +31,14 @@ class UserInfo(BaseModel):
 
 @router.post("/login", response_model=Token)
 async def login(
-    form_data: OAuth2PasswordRequestForm = Depends(),
+    credentials: LoginRequest,
     session: Session = Depends(get_session),
 ):
-    user = session.exec(select(User).where(User.username == form_data.username)).first()
-    if not user or not verify_password(form_data.password, user.hashed_password):
+    user = session.exec(select(User).where(User.username == credentials.username)).first()
+    if not user or not verify_password(credentials.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Usuario o contraseña incorrectos",
-            headers={"WWW-Authenticate": "Bearer"},
         )
     token = create_access_token({"sub": user.username})
     return Token(
